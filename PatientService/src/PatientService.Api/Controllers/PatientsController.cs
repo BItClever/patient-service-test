@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using PatientService.Api.Contracts.Patients;
 using PatientService.Api.Mappings;
 using PatientService.Api.Validation;
+using PatientService.Core.Search;
 using PatientService.Persistence.Contexts;
 
 namespace PatientService.Api.Controllers;
@@ -129,5 +130,52 @@ public sealed class PatientsController : ControllerBase
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return NoContent();
+    }
+
+    /// <summary>
+    /// Returns patients optionally filtered by FHIR-like birthDate query.
+    /// </summary>
+    /// <param name="birthDate">
+    /// FHIR-like birthDate search value, for example:
+    /// 2024,
+    /// 2024-01,
+    /// 2024-01-13,
+    /// ge2024-01-01,
+    /// lt2024-02-01.
+    /// </param>
+    /// <returns>Matching patients.</returns>
+    [HttpGet]
+    [ProducesResponseType(typeof(List<PatientResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<IReadOnlyCollection<PatientResponse>>> Search(
+        [FromQuery] string? birthDate,
+        CancellationToken cancellationToken)
+    {
+        var query = _dbContext.Patients
+            .AsNoTracking()
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(birthDate))
+        {
+            if (!BirthDateSearchParser.TryParse(birthDate, out var criteria, out var error))
+            {
+                return ValidationProblem(new ValidationProblemDetails(new Dictionary<string, string[]>
+                {
+                    ["birthDate"] = new[] { error }
+                }));
+            }
+
+            query = query.ApplyBirthDateSearch(criteria!);
+        }
+
+        var patients = await query
+            .OrderBy(x => x.BirthDate)
+            .ToListAsync(cancellationToken);
+
+        var response = patients
+            .Select(x => x.ToResponse())
+            .ToList();
+
+        return Ok(response);
     }
 }
