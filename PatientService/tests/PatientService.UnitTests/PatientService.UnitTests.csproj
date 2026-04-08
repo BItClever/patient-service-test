@@ -23,6 +23,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\..\src\PatientService.Api\PatientService.Api.csproj" />
 		<ProjectReference Include="..\..\src\PatientService.Core\PatientService.Core.csproj" />
 	</ItemGroup>
 
