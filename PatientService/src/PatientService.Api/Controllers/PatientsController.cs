@@ -94,14 +94,7 @@ public sealed class PatientsController : ControllerBase
             return ValidationProblem(new ValidationProblemDetails(validationErrors));
         }
 
-        if (!GenderExtensions.TryParseApiValue(request.Gender, out var gender))
-        {
-            return ValidationProblem(new ValidationProblemDetails(
-                new Dictionary<string, string[]>
-                {
-                    ["gender"] = new[] { "Gender must be one of: male, female, other, unknown." }
-                }));
-        }
+        GenderExtensions.TryParseApiValue(request.Gender, out var gender);
 
         if (!request.Name.TryToHumanName(out var name, out var nameErrors))
         {

@@ -45,5 +45,6 @@ public sealed class PatientApiFactory : WebApplicationFactory<Program>, IAsyncLi
     public new async Task DisposeAsync()
     {
         await _dbContainer.DisposeAsync();
+        Dispose();
     }
 }
