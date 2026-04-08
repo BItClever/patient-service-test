@@ -2,7 +2,6 @@
 using PatientService.Api.Contracts.Patients;
 using PatientService.Api.Mappings;
 using PatientService.Api.Validation;
-using PatientService.Core.Extensions;
 using PatientService.Core.Search;
 using PatientService.Core.Services;
 
@@ -39,12 +38,8 @@ public sealed class PatientsController : ControllerBase
             return ValidationProblem(new ValidationProblemDetails(validationErrors));
         }
 
-        if (!request.TryToDomain(out var patient, out var mappingErrors))
-        {
-            return ValidationProblem(new ValidationProblemDetails(mappingErrors));
-        }
-
-        var created = await _patientService.CreateAsync(patient!, cancellationToken);
+        var patient = request.ToDomain();
+        var created = await _patientService.CreateAsync(patient, cancellationToken);
 
         _logger.LogInformation("Patient created with id {PatientId}", created.Id);
 
@@ -94,15 +89,12 @@ public sealed class PatientsController : ControllerBase
             return ValidationProblem(new ValidationProblemDetails(validationErrors));
         }
 
-        GenderExtensions.TryParseApiValue(request.Gender, out var gender);
-
-        if (!request.Name.TryToHumanName(out var name, out var nameErrors))
-        {
-            return ValidationProblem(new ValidationProblemDetails(nameErrors));
-        }
+        // Validation already passed — parse without re-checking the result
+        PatientService.Core.Extensions.GenderExtensions.TryParseApiValue(request.Gender, out var gender);
+        var name = request.Name.ToHumanName();
 
         var patient = await _patientService.UpdateAsync(
-            id, request.Active, name!, gender, request.BirthDate!.Value, cancellationToken);
+            id, request.Active, name, gender, request.BirthDate!.Value, cancellationToken);
 
         if (patient is null)
         {
@@ -140,6 +132,7 @@ public sealed class PatientsController : ControllerBase
     /// <param name="birthDate">
     /// FHIR-like birthDate search value, for example:
     /// 2024, 2024-01, 2024-01-13, ge2024-01-01, lt2024-02-01.
+    /// Omit to return all patients.
     /// </param>
     /// <returns>Matching patients.</returns>
     [HttpGet]
