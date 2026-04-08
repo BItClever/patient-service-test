@@ -5,12 +5,13 @@ Test assignment for implementing a .NET 6 REST API for the `Patient` entity.
 ## Implemented Features
 
 - CRUD API for `Patient`
-- FHIR-like search by `birthDate`
+- FHIR-like search by `birthDate` with **pagination**
 - Swagger / OpenAPI documentation
 - PostgreSQL persistence via Entity Framework Core
 - Console seeder that creates 100 patients through API
 - Docker / Docker Compose setup
 - Postman requests and environment
+- Unit and integration tests with 65+ test cases
 
 ## Tech Stack
 
@@ -37,12 +38,31 @@ patient-service-test/
    ├─ .dockerignore
    ├─ src/
    │  ├─ PatientService.Api/
+   │  │  ├─ Controllers/
+   │  │  ├─ Validation/
+   │  │  ├─ Mappings/
+   │  │  ├─ Contracts/
+   │  │  └─ Program.cs
    │  ├─ PatientService.Core/
+   │  │  ├─ Entities/
+   │  │  ├─ ValueObjects/
+   │  │  ├─ Services/
+   │  │  ├─ Repositories/
+   │  │  └─ Search/
    │  ├─ PatientService.Persistence/
+   │  │  ├─ Repositories/
+   │  │  ├─ Contexts/
+   │  │  └─ Configurations/
    │  └─ PatientService.Seeder/
    └─ tests/
-      └─ PatientService.UnitTests/
+      ├─ PatientService.UnitTests/
+      │  ├─ Mappings/
+      │  ├─ Services/
+      │  ├─ Domain/
+      │  ├─ Validation/
+      │  └─ Search/
       └─ PatientService.IntegrationTests/
+         └─ Patients/
 ```
 
 ## API Endpoints
@@ -54,9 +74,10 @@ patient-service-test/
 - `PUT /api/patients/{id}` — update patient
 - `DELETE /api/patients/{id}` — delete patient
 
-### Search
+### Search (with Pagination)
 
-- `GET /api/patients?birthDate=...` — search by birthDate
+- `GET /api/patients?birthDate=...&page=1&size=50` — search by birthDate with pagination
+- `GET /api/patients?page=1&size=50` — list all patients with pagination
 
 ### Example Payload
 
@@ -76,6 +97,43 @@ patient-service-test/
   "active": true
 }
 ```
+
+## Search Response Format
+
+The search endpoint returns a paginated response:
+
+```json
+{
+  "items": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "name": {
+        "id": "d8ff176f-bd0a-4b8e-b329-871952e32e1f",
+        "use": "official",
+        "family": "Иванов",
+        "given": ["Иван", "Иванович"]
+      },
+      "gender": "male",
+      "birthDate": "2024-01-13T18:25:43Z",
+      "active": true
+    }
+  ],
+  "totalCount": 150,
+  "page": 1,
+  "pageSize": 50,
+  "totalPages": 3
+}
+```
+
+### Pagination Parameters
+
+- `page` (optional, default=1): Page number (1-based). Must be >= 1.
+- `size` (optional, default=50): Items per page. Must be between 1 and 100.
+
+Examples:
+- `GET /api/patients?page=1&size=20`
+- `GET /api/patients?birthDate=2024&page=2&size=10`
+- `GET /api/patients?birthDate=ge2024-01-01&page=1&size=50`
 
 ## birthDate Search
 
@@ -111,14 +169,18 @@ Examples:
 - `GET /api/patients?birthDate=ge2024-01-01`
 - `GET /api/patients?birthDate=lt2024-02-01`
 - `GET /api/patients?birthDate=ne2024-01-13`
+- `GET /api/patients?birthDate=2024&page=2&size=10` — page 2, 10 items per page
 
 ## Design Decisions
 
 - **Resource identifier**: `Patient.Id` is used as the primary resource identifier for CRUD operations.
 - **Preserved `name.id`**: The nested `name.id` field remains present to stay compatible with the assignment's example payload.
+- **Active field**: Implemented as `boolean` (not enum) per FHIR Patient standard. The assignment's notation `Active: true | false` specifies allowed values, not a reference list.
 - **birthDate type**: `birthDate` is stored as `DateTimeOffset` to preserve date-time precision and support FHIR-like search semantics.
 - **given field**: `given` is stored in PostgreSQL as `jsonb` because relational search by individual name parts is not required.
 - **HumanName mapping**: `HumanName` is mapped as an owned type within the `patients` table.
+- **Pagination strategy**: Implemented as page/size model with max size limit of 100 to prevent large result sets and resource exhaustion.
+- **Validation consolidation**: Validation is centralized in `PatientRequestValidator` to avoid duplication across layers.
 
 ## Running Locally
 
@@ -224,6 +286,28 @@ From the `PatientService` directory:
 dotnet test
 ```
 
+### Test Coverage
+
+**Unit Tests (41 tests):**
+- `PatientRequestValidatorTests` — validation logic (7 tests)
+- `HumanNameTests` — value object invariants (9 tests)
+- `PatientTests` — domain entity invariants (3 tests)
+- `PatientServiceTests` — service layer with pagination (10 tests)
+- `PatientSearchExtensionsTests` — FHIR search logic (4 tests)
+- `BirthDateSearchParserTests` — date/time parsing (4 tests)
+- `PatientRequestMappingsTests` — DTO mapping and transformation (4 tests)
+
+**Integration Tests (24 tests):**
+- `PatientCrudTests` — full CRUD workflows (12 tests)
+- `PatientSearchTests` — search with filters and pagination (12 tests)
+
+**Total: 65+ test cases** covering:
+- Happy paths and error scenarios
+- Edge cases (boundary dates, invalid parameters)
+- Pagination logic (skip/take, page boundaries)
+- Search prefix semantics (eq, ne, gt, ge, lt, le, sa, eb, ap)
+- Validation at API and domain layers
+
 ## Postman
 
 Postman artifacts are located in:
@@ -239,8 +323,10 @@ They include:
 
 The collection demonstrates:
 
-- patient creation
-- update
+- patient creation with validation
+- update with proper conflict handling
 - get by id
-- delete
+- delete with idempotency semantics
 - multiple birthDate search scenarios
+- pagination examples (page/size parameters)
+- error response handling
