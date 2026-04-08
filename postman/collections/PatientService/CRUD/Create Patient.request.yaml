@@ -1,0 +1,54 @@
+$kind: http-request
+name: Create Patient
+url: "{{baseUrl}}/api/patients"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \  \"name\": {\r
+
+    \    \"id\": \"d8ff176f-bd0a-4b8e-b329-871952e32e1f\",\r
+
+    \    \"use\": \"official\",\r
+
+    \    \"family\": \"Иванов\",\r
+
+    \    \"given\": [\r
+
+    \      \"Иван\",\r
+
+    \      \"Иванович\"\r
+
+    \    ]\r
+
+    \  },\r
+
+    \  \"gender\": \"male\",\r
+
+    \  \"birthDate\": \"2024-01-13T18:25:43Z\",\r
+
+    \  \"active\": true\r
+
+    }"
+scripts:
+  - type: afterResponse
+    code: "pm.test(\"Status code is 201\", function () {\r
+
+      \    pm.response.to.have.status(201);\r
+
+      });\r
+
+      \r
+
+      const responseJson = pm.response.json();\r
+
+      \r
+
+      if (responseJson.id) {\r
+
+      \    pm.environment.set(\"patientId\", responseJson.id);\r
+
+      }"
+    language: text/javascript
+order: 1775653195832

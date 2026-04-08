@@ -1,0 +1,15 @@
+$kind: http-request
+name: Search ne
+url: "{{baseUrl}}/api/patients?birthDate=ne2024-01-13"
+method: GET
+queryParams:
+  birthDate: ne2024-01-13
+scripts:
+  - type: afterResponse
+    code: "pm.test(\"Status code is 200\", function () {\r
+
+      \    pm.response.to.have.status(200);\r
+
+      });"
+    language: text/javascript
+order: 4255087095652240

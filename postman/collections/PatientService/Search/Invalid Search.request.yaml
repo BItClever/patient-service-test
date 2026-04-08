@@ -1,0 +1,15 @@
+$kind: http-request
+name: Invalid Search
+url: "{{baseUrl}}/api/patients?birthDate=xx2024-01-01"
+method: GET
+queryParams:
+  birthDate: xx2024-01-01
+scripts:
+  - type: afterResponse
+    code: "pm.test(\"Status code is 400\", function () {\r
+
+      \    pm.response.to.have.status(400);\r
+
+      });"
+    language: text/javascript
+order: 4360804729434216

@@ -1,0 +1,42 @@
+$kind: http-request
+name: Update Patient
+url: "{{baseUrl}}/api/patients/{{patientId}}"
+method: PUT
+body:
+  type: json
+  content: "{\r
+
+    \  \"name\": {\r
+
+    \    \"id\": \"d8ff176f-bd0a-4b8e-b329-871952e32e1f\",\r
+
+    \    \"use\": \"official\",\r
+
+    \    \"family\": \"Петров\",\r
+
+    \    \"given\": [\r
+
+    \      \"Пётр\",\r
+
+    \      \"Иванович\"\r
+
+    \    ]\r
+
+    \  },\r
+
+    \  \"gender\": \"male\",\r
+
+    \  \"birthDate\": \"2024-01-14T09:15:00Z\",\r
+
+    \  \"active\": false\r
+
+    }"
+scripts:
+  - type: afterResponse
+    code: "pm.test(\"Status code is 200\", function () {\r
+
+      \    pm.response.to.have.status(200);\r
+
+      });"
+    language: text/javascript
+order: 4435630248690364

@@ -1,0 +1,13 @@
+$kind: http-request
+name: Get Patient By Id
+url: "{{baseUrl}}/api/patients/{{patientId}}"
+method: GET
+scripts:
+  - type: afterResponse
+    code: "pm.test(\"Status code is 200\", function () {\r
+
+      \    pm.response.to.have.status(200);\r
+
+      });"
+    language: text/javascript
+order: 3827916963159666

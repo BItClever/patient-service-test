@@ -1,0 +1,15 @@
+$kind: http-request
+name: Search lt
+url: "{{baseUrl}}/api/patients?birthDate=lt2024-02-01"
+method: GET
+queryParams:
+  birthDate: lt2024-02-01
+scripts:
+  - type: afterResponse
+    code: "pm.test(\"Status code is 200\", function () {\r
+
+      \    pm.response.to.have.status(200);\r
+
+      });"
+    language: text/javascript
+order: 4061526324119337

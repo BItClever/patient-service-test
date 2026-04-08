@@ -1,0 +1,13 @@
+$kind: http-request
+name: Delete Patient
+url: "{{baseUrl}}/api/patients/{{patientId}}"
+method: DELETE
+scripts:
+  - type: afterResponse
+    code: "pm.test(\"Status code is 204\", function () {\r
+
+      \    pm.response.to.have.status(204);\r
+
+      });"
+    language: text/javascript
+order: 4462074011578597
