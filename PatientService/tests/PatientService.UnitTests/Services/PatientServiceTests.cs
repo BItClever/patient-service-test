@@ -132,29 +132,49 @@ public sealed class PatientServiceTests
     {
         var patients = new List<Patient> { CreateTestPatient() };
         _repositoryMock
-            .Setup(r => r.SearchAsync(null, default))
-            .ReturnsAsync((IReadOnlyList<Patient>)patients);
+            .Setup(r => r.SearchPagedAsync(null, 0, 50, default))
+            .ReturnsAsync(((IReadOnlyList<Patient>)patients, 1));
 
-        var result = await _service.SearchAsync(null, default);
+        var result = await _service.SearchAsync(null, 1, 50, default);
 
-        Assert.Single(result);
-        _repositoryMock.Verify(r => r.SearchAsync(null, default), Times.Once);
+        Assert.Single(result.Items);
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal(1, result.Page);
+        Assert.Equal(50, result.PageSize);
+        _repositoryMock.Verify(r => r.SearchPagedAsync(null, 0, 50, default), Times.Once);
     }
 
     [Fact]
     public async Task SearchAsync_WithCriteria_ShouldPassCriteriaToRepository()
     {
-        BirthDateSearchParser.TryParse("ge2024-01-01", out var criteria, out _);
+        Assert.True(BirthDateSearchParser.TryParse("ge2024-01-01", out var criteria, out _));
         var patients = new List<Patient> { CreateTestPatient() };
 
         _repositoryMock
-            .Setup(r => r.SearchAsync(criteria, default))
-            .ReturnsAsync((IReadOnlyList<Patient>)patients);
+            .Setup(r => r.SearchPagedAsync(criteria, 20, 20, default))
+            .ReturnsAsync(((IReadOnlyList<Patient>)patients, 1));
 
-        var result = await _service.SearchAsync(criteria, default);
+        var result = await _service.SearchAsync(criteria, 2, 20, default);
 
-        Assert.Single(result);
-        _repositoryMock.Verify(r => r.SearchAsync(criteria, default), Times.Once);
+        Assert.Single(result.Items);
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal(2, result.Page);
+        Assert.Equal(20, result.PageSize);
+        _repositoryMock.Verify(r => r.SearchPagedAsync(criteria, 20, 20, default), Times.Once);
+    }
+
+    [Fact]
+    public async Task SearchAsync_ShouldCalculateTotalPagesCorrectly()
+    {
+        var patients = new List<Patient> { CreateTestPatient() };
+        _repositoryMock
+            .Setup(r => r.SearchPagedAsync(null, 0, 10, default))
+            .ReturnsAsync(((IReadOnlyList<Patient>)patients, 25));
+
+        var result = await _service.SearchAsync(null, 1, 10, default);
+
+        Assert.Equal(25, result.TotalCount);
+        Assert.Equal(3, result.TotalPages);
     }
 
     // --- helpers ---

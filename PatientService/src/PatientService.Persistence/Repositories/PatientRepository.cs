@@ -39,6 +39,32 @@ public sealed class PatientRepository : IPatientRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<(IReadOnlyList<Patient> Items, int TotalCount)> SearchPagedAsync(
+        BirthDateSearchCriteria? criteria,
+        int skip,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        var query = _dbContext.Patients
+            .AsNoTracking()
+            .AsQueryable();
+
+        if (criteria is not null)
+        {
+            query = query.ApplyBirthDateSearch(criteria);
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .OrderBy(x => x.BirthDate)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync(cancellationToken);
+
+        return (items, totalCount);
+    }
+
     public Task AddAsync(Patient patient, CancellationToken cancellationToken)
     {
         return _dbContext.Patients.AddAsync(patient, cancellationToken).AsTask();

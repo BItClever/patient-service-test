@@ -134,14 +134,30 @@ public sealed class PatientsController : ControllerBase
     /// 2024, 2024-01, 2024-01-13, ge2024-01-01, lt2024-02-01.
     /// Omit to return all patients.
     /// </param>
-    /// <returns>Matching patients.</returns>
+    /// <param name="page">Page number (1-based). Default is 1.</param>
+    /// <param name="size">Page size. Default is 50, max is 100.</param>
+    /// <returns>Paged list of matching patients.</returns>
     [HttpGet]
-    [ProducesResponseType(typeof(List<PatientResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(PagedPatientResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<IReadOnlyCollection<PatientResponse>>> Search(
+    public async Task<ActionResult<PagedPatientResponse>> Search(
         [FromQuery] string? birthDate,
-        CancellationToken cancellationToken)
+        [FromQuery] int page = 1,
+        [FromQuery] int size = 50,
+        CancellationToken cancellationToken = default)
     {
+        if (page < 1)
+        {
+            return ValidationProblem(new ValidationProblemDetails(
+                new Dictionary<string, string[]> { ["page"] = new[] { "Page must be greater than 0." } }));
+        }
+
+        if (size < 1 || size > 100)
+        {
+            return ValidationProblem(new ValidationProblemDetails(
+                new Dictionary<string, string[]> { ["size"] = new[] { "Size must be between 1 and 100." } }));
+        }
+
         BirthDateSearchCriteria? criteria = null;
 
         if (!string.IsNullOrWhiteSpace(birthDate))
@@ -153,8 +169,15 @@ public sealed class PatientsController : ControllerBase
             }
         }
 
-        var patients = await _patientService.SearchAsync(criteria, cancellationToken);
-        var response = patients.Select(x => x.ToResponse()).ToList();
+        var result = await _patientService.SearchAsync(criteria, page, size, cancellationToken);
+        var response = new PagedPatientResponse
+        {
+            Items = result.Items.Select(x => x.ToResponse()).ToList(),
+            TotalCount = result.TotalCount,
+            Page = result.Page,
+            PageSize = result.PageSize,
+            TotalPages = result.TotalPages
+        };
         return Ok(response);
     }
 }

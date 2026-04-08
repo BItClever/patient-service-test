@@ -30,8 +30,11 @@ public sealed class PatientSearchTests : IAsyncLifetime
         var response = await _client.GetAsync("/api/patients");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<List<PatientResponse>>();
-        Assert.Equal(2, body!.Count);
+        var body = await response.Content.ReadFromJsonAsync<PagedPatientResponse>();
+        Assert.Equal(2, body!.Items.Count);
+        Assert.Equal(2, body.TotalCount);
+        Assert.Equal(1, body.Page);
+        Assert.Equal(50, body.PageSize);
     }
 
     [Fact]
@@ -43,9 +46,10 @@ public sealed class PatientSearchTests : IAsyncLifetime
         var response = await _client.GetAsync("/api/patients?birthDate=2024");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<List<PatientResponse>>();
-        Assert.Single(body!);
-        Assert.Equal(2024, body![0].BirthDate.Year);
+        var body = await response.Content.ReadFromJsonAsync<PagedPatientResponse>();
+        Assert.Single(body!.Items);
+        Assert.Equal(1, body.TotalCount);
+        Assert.Equal(2024, body.Items.ElementAt(0).BirthDate.Year);
     }
 
     [Fact]
@@ -57,9 +61,9 @@ public sealed class PatientSearchTests : IAsyncLifetime
         var response = await _client.GetAsync("/api/patients?birthDate=2024-01");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<List<PatientResponse>>();
-        Assert.Single(body!);
-        Assert.Equal(1, body![0].BirthDate.Month);
+        var body = await response.Content.ReadFromJsonAsync<PagedPatientResponse>();
+        Assert.Single(body!.Items);
+        Assert.Equal(1, body.Items.ElementAt(0).BirthDate.Month);
     }
 
     [Fact]
@@ -71,9 +75,9 @@ public sealed class PatientSearchTests : IAsyncLifetime
         var response = await _client.GetAsync("/api/patients?birthDate=2024-01-13");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<List<PatientResponse>>();
-        Assert.Single(body!);
-        Assert.Equal(13, body![0].BirthDate.Day);
+        var body = await response.Content.ReadFromJsonAsync<PagedPatientResponse>();
+        Assert.Single(body!.Items);
+        Assert.Equal(13, body.Items.ElementAt(0).BirthDate.Day);
     }
 
     [Fact]
@@ -85,9 +89,9 @@ public sealed class PatientSearchTests : IAsyncLifetime
         var response = await _client.GetAsync("/api/patients?birthDate=ge2024-01-01");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<List<PatientResponse>>();
-        Assert.Single(body!);
-        Assert.Equal(2024, body![0].BirthDate.Year);
+        var body = await response.Content.ReadFromJsonAsync<PagedPatientResponse>();
+        Assert.Single(body!.Items);
+        Assert.Equal(2024, body.Items.ElementAt(0).BirthDate.Year);
     }
 
     [Fact]
@@ -99,9 +103,9 @@ public sealed class PatientSearchTests : IAsyncLifetime
         var response = await _client.GetAsync("/api/patients?birthDate=lt2024-02-01");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<List<PatientResponse>>();
-        Assert.Single(body!);
-        Assert.Equal(1, body![0].BirthDate.Month);
+        var body = await response.Content.ReadFromJsonAsync<PagedPatientResponse>();
+        Assert.Single(body!.Items);
+        Assert.Equal(1, body.Items.ElementAt(0).BirthDate.Month);
     }
 
     [Fact]
@@ -113,9 +117,9 @@ public sealed class PatientSearchTests : IAsyncLifetime
         var response = await _client.GetAsync("/api/patients?birthDate=ne2024-01-13");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<List<PatientResponse>>();
-        Assert.Single(body!);
-        Assert.Equal(14, body![0].BirthDate.Day);
+        var body = await response.Content.ReadFromJsonAsync<PagedPatientResponse>();
+        Assert.Single(body!.Items);
+        Assert.Equal(14, body.Items.ElementAt(0).BirthDate.Day);
     }
 
     [Fact]
@@ -134,8 +138,44 @@ public sealed class PatientSearchTests : IAsyncLifetime
         var response = await _client.GetAsync("/api/patients?birthDate=2024");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<List<PatientResponse>>();
-        Assert.Empty(body!);
+        var body = await response.Content.ReadFromJsonAsync<PagedPatientResponse>();
+        Assert.Empty(body!.Items);
+        Assert.Equal(0, body.TotalCount);
+    }
+
+    [Fact]
+    public async Task Search_WithPagination_ShouldReturnCorrectPage()
+    {
+        for (int i = 0; i < 5; i++)
+        {
+            await CreatePatientWithBirthDateAsync(new DateTimeOffset(2024, 1, i + 1, 0, 0, 0, TimeSpan.Zero));
+        }
+
+        var response = await _client.GetAsync("/api/patients?page=2&size=2");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PagedPatientResponse>();
+        Assert.Equal(2, body!.Items.Count);
+        Assert.Equal(5, body.TotalCount);
+        Assert.Equal(2, body.Page);
+        Assert.Equal(2, body.PageSize);
+        Assert.Equal(3, body.TotalPages);
+    }
+
+    [Fact]
+    public async Task Search_WithInvalidPage_ShouldReturn400()
+    {
+        var response = await _client.GetAsync("/api/patients?page=0");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Search_WithInvalidSize_ShouldReturn400()
+    {
+        var response = await _client.GetAsync("/api/patients?size=150");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     // --- helpers ---

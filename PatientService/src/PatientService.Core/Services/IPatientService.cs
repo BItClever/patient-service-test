@@ -11,5 +11,5 @@ public interface IPatientService
     Task<Patient?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
     Task<Patient?> UpdateAsync(Guid id, bool active, HumanName name, Gender gender, DateTimeOffset birthDate, CancellationToken cancellationToken);
     Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken);
-    Task<IReadOnlyList<Patient>> SearchAsync(BirthDateSearchCriteria? criteria, CancellationToken cancellationToken);
+    Task<PagedResult<Patient>> SearchAsync(BirthDateSearchCriteria? criteria, int page, int pageSize, CancellationToken cancellationToken);
 }

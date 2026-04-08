@@ -61,8 +61,10 @@ public sealed class PatientService : IPatientService
         return true;
     }
 
-    public Task<IReadOnlyList<Patient>> SearchAsync(BirthDateSearchCriteria? criteria, CancellationToken cancellationToken)
+    public async Task<PagedResult<Patient>> SearchAsync(BirthDateSearchCriteria? criteria, int page, int pageSize, CancellationToken cancellationToken)
     {
-        return _repository.SearchAsync(criteria, cancellationToken);
+        var skip = (page - 1) * pageSize;
+        var (items, totalCount) = await _repository.SearchPagedAsync(criteria, skip, pageSize, cancellationToken);
+        return new PagedResult<Patient>(items, totalCount, page, pageSize);
     }
 }
