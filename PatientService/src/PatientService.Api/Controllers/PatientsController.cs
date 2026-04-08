@@ -1,10 +1,10 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using PatientService.Api.Contracts.Patients;
 using PatientService.Api.Mappings;
 using PatientService.Api.Validation;
+using PatientService.Core.Extensions;
 using PatientService.Core.Search;
-using PatientService.Persistence.Contexts;
+using PatientService.Core.Services;
 
 namespace PatientService.Api.Controllers;
 
@@ -12,11 +12,13 @@ namespace PatientService.Api.Controllers;
 [Route("api/[controller]")]
 public sealed class PatientsController : ControllerBase
 {
-    private readonly AppDbContext _dbContext;
+    private readonly IPatientService _patientService;
+    private readonly ILogger<PatientsController> _logger;
 
-    public PatientsController(AppDbContext dbContext)
+    public PatientsController(IPatientService patientService, ILogger<PatientsController> logger)
     {
-        _dbContext = dbContext;
+        _patientService = patientService;
+        _logger = logger;
     }
 
     /// <summary>
@@ -27,7 +29,9 @@ public sealed class PatientsController : ControllerBase
     [HttpPost]
     [ProducesResponseType(typeof(PatientResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<PatientResponse>> Create([FromBody] CreatePatientRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<PatientResponse>> Create(
+        [FromBody] CreatePatientRequest request,
+        CancellationToken cancellationToken)
     {
         var validationErrors = PatientRequestValidator.Validate(request);
         if (validationErrors.Count > 0)
@@ -40,11 +44,11 @@ public sealed class PatientsController : ControllerBase
             return ValidationProblem(new ValidationProblemDetails(mappingErrors));
         }
 
-        _dbContext.Patients.Add(patient!);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        var created = await _patientService.CreateAsync(patient!, cancellationToken);
 
-        var response = patient!.ToResponse();
+        _logger.LogInformation("Patient created with id {PatientId}", created.Id);
 
+        var response = created.ToResponse();
         return CreatedAtAction(nameof(GetById), new { id = response.Id }, response);
     }
 
@@ -56,12 +60,11 @@ public sealed class PatientsController : ControllerBase
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(PatientResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<PatientResponse>> GetById([FromRoute] Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<PatientResponse>> GetById(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
     {
-        var patient = await _dbContext.Patients
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-
+        var patient = await _patientService.GetByIdAsync(id, cancellationToken);
         if (patient is null)
         {
             return NotFound();
@@ -91,21 +94,29 @@ public sealed class PatientsController : ControllerBase
             return ValidationProblem(new ValidationProblemDetails(validationErrors));
         }
 
-        var patient = await _dbContext.Patients
-            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (!GenderExtensions.TryParseApiValue(request.Gender, out var gender))
+        {
+            return ValidationProblem(new ValidationProblemDetails(
+                new Dictionary<string, string[]>
+                {
+                    ["gender"] = new[] { "Gender must be one of: male, female, other, unknown." }
+                }));
+        }
+
+        if (!request.Name.TryToHumanName(out var name, out var nameErrors))
+        {
+            return ValidationProblem(new ValidationProblemDetails(nameErrors));
+        }
+
+        var patient = await _patientService.UpdateAsync(
+            id, request.Active, name!, gender, request.BirthDate, cancellationToken);
 
         if (patient is null)
         {
             return NotFound();
         }
 
-        if (!request.TryApplyToDomain(patient, out var mappingErrors))
-        {
-            return ValidationProblem(new ValidationProblemDetails(mappingErrors));
-        }
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
+        _logger.LogInformation("Patient updated with id {PatientId}", id);
         return Ok(patient.ToResponse());
     }
 
@@ -116,19 +127,17 @@ public sealed class PatientsController : ControllerBase
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Delete([FromRoute] Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Delete(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
     {
-        var patient = await _dbContext.Patients
-            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-
-        if (patient is null)
+        var deleted = await _patientService.DeleteAsync(id, cancellationToken);
+        if (!deleted)
         {
             return NotFound();
         }
 
-        _dbContext.Patients.Remove(patient);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
+        _logger.LogInformation("Patient deleted with id {PatientId}", id);
         return NoContent();
     }
 
@@ -137,11 +146,7 @@ public sealed class PatientsController : ControllerBase
     /// </summary>
     /// <param name="birthDate">
     /// FHIR-like birthDate search value, for example:
-    /// 2024,
-    /// 2024-01,
-    /// 2024-01-13,
-    /// ge2024-01-01,
-    /// lt2024-02-01.
+    /// 2024, 2024-01, 2024-01-13, ge2024-01-01, lt2024-02-01.
     /// </param>
     /// <returns>Matching patients.</returns>
     [HttpGet]
@@ -151,31 +156,19 @@ public sealed class PatientsController : ControllerBase
         [FromQuery] string? birthDate,
         CancellationToken cancellationToken)
     {
-        var query = _dbContext.Patients
-            .AsNoTracking()
-            .AsQueryable();
+        BirthDateSearchCriteria? criteria = null;
 
         if (!string.IsNullOrWhiteSpace(birthDate))
         {
-            if (!BirthDateSearchParser.TryParse(birthDate, out var criteria, out var error))
+            if (!BirthDateSearchParser.TryParse(birthDate, out criteria, out var error))
             {
-                return ValidationProblem(new ValidationProblemDetails(new Dictionary<string, string[]>
-                {
-                    ["birthDate"] = new[] { error }
-                }));
+                return ValidationProblem(new ValidationProblemDetails(
+                    new Dictionary<string, string[]> { ["birthDate"] = new[] { error } }));
             }
-
-            query = query.ApplyBirthDateSearch(criteria!);
         }
 
-        var patients = await query
-            .OrderBy(x => x.BirthDate)
-            .ToListAsync(cancellationToken);
-
-        var response = patients
-            .Select(x => x.ToResponse())
-            .ToList();
-
+        var patients = await _patientService.SearchAsync(criteria, cancellationToken);
+        var response = patients.Select(x => x.ToResponse()).ToList();
         return Ok(response);
     }
 }
