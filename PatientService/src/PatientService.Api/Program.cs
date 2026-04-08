@@ -44,11 +44,15 @@ app.UseExceptionHandler(appError =>
             logger.LogError(exceptionFeature.Error, "Unhandled exception occurred");
         }
 
+        var traceId = System.Diagnostics.Activity.Current?.Id
+                      ?? context.TraceIdentifier;
+
         await context.Response.WriteAsJsonAsync(new
         {
             type = "https://tools.ietf.org/html/rfc7231#section-6.6.1",
             title = "An unexpected error occurred.",
-            status = 500
+            status = 500,
+            traceId
         });
     });
 });
