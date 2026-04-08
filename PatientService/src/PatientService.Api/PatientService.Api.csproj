@@ -4,6 +4,7 @@
 		<TargetFramework>net6.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -18,10 +19,6 @@
 	<ItemGroup>
 		<ProjectReference Include="..\PatientService.Core\PatientService.Core.csproj" />
 		<ProjectReference Include="..\PatientService.Persistence\PatientService.Persistence.csproj" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<Folder Include="Json\" />
 	</ItemGroup>
 
 </Project>
