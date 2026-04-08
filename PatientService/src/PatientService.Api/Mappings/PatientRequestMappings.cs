@@ -13,23 +13,10 @@ public static class PatientRequestMappings
         out Patient? patient,
         out Dictionary<string, string[]> errors)
     {
-        return TryCreatePatient(
-            request.Name,
-            request.Active,
-            request.Gender,
-            request.BirthDate,
-            out patient,
-            out errors);
-    }
-
-    public static bool TryApplyToDomain(
-        this UpdatePatientRequest request,
-        Patient existingPatient,
-        out Dictionary<string, string[]> errors)
-    {
+        patient = null;
         errors = new Dictionary<string, string[]>();
 
-        if (!GenderExtensions.TryParseApiValue(request.Gender, out var gender))
+        if (!GenderExtensions.TryParseApiValue(request.Gender, out Gender gender))
         {
             errors["gender"] = new[] { "Gender must be one of: male, female, other, unknown." };
             return false;
@@ -38,17 +25,12 @@ public static class PatientRequestMappings
         try
         {
             var name = new HumanName(
-                request.Name.Id ?? existingPatient.Name.Id,
+                request.Name.Id ?? Guid.NewGuid(),
                 request.Name.Use,
                 request.Name.Family,
                 request.Name.Given);
 
-            existingPatient.Update(
-                request.Active,
-                name,
-                gender,
-                request.BirthDate);
-
+            patient = new Patient(request.Active, name, gender, request.BirthDate);
             return true;
         }
         catch (ArgumentNullException ex)
@@ -68,47 +50,26 @@ public static class PatientRequestMappings
         }
     }
 
-    private static bool TryCreatePatient(
-        HumanNameDto nameDto,
-        bool active,
-        string genderValue,
-        DateTimeOffset birthDate,
-        out Patient? patient,
+    public static bool TryToHumanName(
+        this HumanNameDto dto,
+        out HumanName? name,
         out Dictionary<string, string[]> errors)
     {
-        patient = null;
         errors = new Dictionary<string, string[]>();
-
-        if (!GenderExtensions.TryParseApiValue(genderValue, out Gender gender))
-        {
-            errors["gender"] = new[] { "Gender must be one of: male, female, other, unknown." };
-            return false;
-        }
+        name = null;
 
         try
         {
-            var name = new HumanName(
-                nameDto.Id ?? Guid.NewGuid(),
-                nameDto.Use,
-                nameDto.Family,
-                nameDto.Given);
-
-            patient = new Patient(active, name, gender, birthDate);
+            name = new HumanName(
+                dto.Id ?? Guid.NewGuid(),
+                dto.Use,
+                dto.Family,
+                dto.Given);
             return true;
-        }
-        catch (ArgumentNullException ex)
-        {
-            errors["request"] = new[] { ex.Message };
-            return false;
-        }
-        catch (ArgumentOutOfRangeException ex)
-        {
-            errors["request"] = new[] { ex.Message };
-            return false;
         }
         catch (ArgumentException ex)
         {
-            errors["request"] = new[] { ex.Message };
+            errors["name"] = new[] { ex.Message };
             return false;
         }
     }

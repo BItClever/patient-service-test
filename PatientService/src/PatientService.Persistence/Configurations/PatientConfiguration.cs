@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using PatientService.Core.Entities;
+using PatientService.Core.Enums;
 using System.Text.Json;
 
 namespace PatientService.Persistence.Configurations;
@@ -23,7 +24,9 @@ public sealed class PatientConfiguration : IEntityTypeConfiguration<Patient>
 
         builder.Property(x => x.Gender)
             .HasColumnName("gender")
-            .HasConversion<string>()
+            .HasConversion(
+                v => v.ToString().ToLowerInvariant(),
+                v => Enum.Parse<Gender>(v, true))
             .IsRequired();
 
         builder.Property(x => x.BirthDate)

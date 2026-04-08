@@ -47,6 +47,13 @@ public static class PatientRequestValidator
         {
             AddError(errors, "gender", "Gender is required.");
         }
+        if (!string.IsNullOrWhiteSpace(gender) &&
+    !new[] { "male", "female", "other", "unknown" }
+        .Contains(gender.Trim().ToLowerInvariant()))
+        {
+            AddError(errors, "gender",
+                "Gender must be one of: male, female, other, unknown.");
+        }
 
         return errors.ToDictionary(x => x.Key, x => x.Value.ToArray());
     }
