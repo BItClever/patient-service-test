@@ -6,4 +6,5 @@
 **/.github/
 **/TestResults/
 .gitignore
+.postman
 README.md
