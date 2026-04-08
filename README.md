@@ -42,6 +42,7 @@ patient-service-test/
    │  └─ PatientService.Seeder/
    └─ tests/
       └─ PatientService.UnitTests/
+      └─ PatientService.IntegrationTests/
 ```
 
 ## API Endpoints
