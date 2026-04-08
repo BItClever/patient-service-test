@@ -31,18 +31,17 @@ public sealed class PatientRequestValidatorTests
     }
 
     [Fact]
-    public void Validate_WhenBirthDateIsDefault_ShouldReturnBirthDateError()
+    public void Validate_WhenBirthDateIsNull_ShouldReturnBirthDateError()
     {
         var request = new CreatePatientRequest
         {
             Active = true,
             Name = new HumanNameDto { Family = "Иванов" },
             Gender = "male",
-            BirthDate = default
+            BirthDate = null
         };
 
         var errors = PatientRequestValidator.Validate(request);
-
         Assert.True(errors.ContainsKey("birthDate"));
     }
 
