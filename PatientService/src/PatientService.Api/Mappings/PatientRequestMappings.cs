@@ -30,20 +30,25 @@ public static class PatientRequestMappings
                 request.Name.Family,
                 request.Name.Given);
 
-            patient = new Patient(request.Active, name, gender, request.BirthDate);
+            patient = new Patient(request.Active, name, gender, request.BirthDate!.Value);
             return true;
         }
-        catch (ArgumentNullException ex)
+        catch (ArgumentNullException ex) when (ex.ParamName == "name")
         {
-            errors["request"] = new[] { ex.Message };
+            errors["name"] = new[] { ex.Message };
             return false;
         }
-        catch (ArgumentOutOfRangeException ex)
+        catch (ArgumentOutOfRangeException ex) when (ex.ParamName == "birthDate")
         {
-            errors["request"] = new[] { ex.Message };
+            errors["birthDate"] = new[] { ex.Message };
             return false;
         }
-        catch (ArgumentException ex)
+        catch (ArgumentException ex) when (ex.ParamName == "family")
+        {
+            errors["name.family"] = new[] { ex.Message };
+            return false;
+        }
+        catch (Exception ex)
         {
             errors["request"] = new[] { ex.Message };
             return false;
@@ -66,6 +71,11 @@ public static class PatientRequestMappings
                 dto.Family,
                 dto.Given);
             return true;
+        }
+        catch (ArgumentException ex) when (ex.ParamName == "family")
+        {
+            errors["name.family"] = new[] { ex.Message };
+            return false;
         }
         catch (ArgumentException ex)
         {

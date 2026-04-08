@@ -109,7 +109,7 @@ public sealed class PatientsController : ControllerBase
         }
 
         var patient = await _patientService.UpdateAsync(
-            id, request.Active, name!, gender, request.BirthDate, cancellationToken);
+            id, request.Active, name!, gender, request.BirthDate!.Value, cancellationToken);
 
         if (patient is null)
         {
