@@ -1,4 +1,5 @@
 ﻿using PatientService.Api.Contracts.Patients;
+using PatientService.Core.Extensions;
 
 namespace PatientService.Api.Validation;
 
@@ -17,7 +18,7 @@ public static class PatientRequestValidator
     private static Dictionary<string, string[]> ValidateInternal(
         HumanNameDto? name,
         string? gender,
-        DateTimeOffset birthDate)
+        DateTimeOffset? birthDate)
     {
         var errors = new Dictionary<string, List<string>>();
 
@@ -33,12 +34,11 @@ public static class PatientRequestValidator
             }
         }
 
-        if (birthDate == default)
+        if (birthDate is null)
         {
             AddError(errors, "birthDate", "BirthDate is required.");
         }
-
-        if (birthDate > DateTimeOffset.UtcNow)
+        else if (birthDate.Value > DateTimeOffset.UtcNow)
         {
             AddError(errors, "birthDate", "BirthDate cannot be in the future.");
         }
@@ -47,12 +47,9 @@ public static class PatientRequestValidator
         {
             AddError(errors, "gender", "Gender is required.");
         }
-        if (!string.IsNullOrWhiteSpace(gender) &&
-    !new[] { "male", "female", "other", "unknown" }
-        .Contains(gender.Trim().ToLowerInvariant()))
+        else if (!GenderExtensions.TryParseApiValue(gender, out _))
         {
-            AddError(errors, "gender",
-                "Gender must be one of: male, female, other, unknown.");
+            AddError(errors, "gender", "Gender must be one of: male, female, other, unknown.");
         }
 
         return errors.ToDictionary(x => x.Key, x => x.Value.ToArray());
@@ -65,7 +62,6 @@ public static class PatientRequestValidator
             messages = new List<string>();
             errors[key] = messages;
         }
-
         messages.Add(message);
     }
 }
